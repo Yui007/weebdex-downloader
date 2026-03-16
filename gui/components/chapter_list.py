@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QListWidget, 
-    QListWidgetItem, QPushButton, QLabel, QLineEdit
+    QListWidgetItem, QPushButton, QLabel, QLineEdit, QComboBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -19,6 +19,7 @@ class ChapterListWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._chapters: List[Chapter] = []
+        self._filtered_chapters: List[Chapter] = []
         self._setup_ui()
     
     def _setup_ui(self):
@@ -36,6 +37,15 @@ class ChapterListWidget(QWidget):
         header.addWidget(self.count_label)
         
         header.addStretch()
+        
+        # Group filter
+        group_label = QLabel("Group:")
+        header.addWidget(group_label)
+        
+        self.group_filter = QComboBox()
+        self.group_filter.setFixedWidth(200)
+        self.group_filter.currentIndexChanged.connect(self._apply_group_filter)
+        header.addWidget(self.group_filter)
         
         # Range input
         self.range_input = QLineEdit()
@@ -83,9 +93,59 @@ class ChapterListWidget(QWidget):
     def set_chapters(self, chapters: List[Chapter]):
         """Populate the list with chapters."""
         self._chapters = chapters
+        self._filtered_chapters = chapters
+        
+        # Populate group filter
+        self._populate_group_filter()
+        
+        # Display chapters
+        self._display_chapters()
+    
+    def _populate_group_filter(self):
+        """Populate the group filter dropdown with unique groups."""
+        # Collect all unique groups
+        groups = set()
+        for chapter in self._chapters:
+            for group in chapter.groups:
+                groups.add(group.name)
+        
+        # Sort groups alphabetically
+        sorted_groups = sorted(groups)
+        
+        # Block signals while updating
+        self.group_filter.blockSignals(True)
+        self.group_filter.clear()
+        
+        # Add "All Groups" option
+        self.group_filter.addItem("All Groups", None)
+        
+        # Add each group
+        for group in sorted_groups:
+            self.group_filter.addItem(group, group)
+        
+        self.group_filter.blockSignals(False)
+    
+    def _apply_group_filter(self):
+        """Filter chapters by selected group."""
+        selected_group = self.group_filter.currentData()
+        
+        if selected_group is None:
+            # Show all chapters
+            self._filtered_chapters = self._chapters
+        else:
+            # Filter by group
+            self._filtered_chapters = [
+                ch for ch in self._chapters
+                if any(g.name == selected_group for g in ch.groups)
+            ]
+        
+        self._display_chapters()
+    
+    def _display_chapters(self):
+        """Display the filtered chapters in the list."""
         self.list_widget.clear()
         
-        for i, chapter in enumerate(chapters):
+        for i, chapter in enumerate(self._filtered_chapters):
             item = QListWidgetItem()
             
             # Build display text
@@ -102,7 +162,14 @@ class ChapterListWidget(QWidget):
             
             self.list_widget.addItem(item)
         
-        self.count_label.setText(f"{len(chapters)} chapters")
+        # Update count label to show filtered/total
+        if len(self._filtered_chapters) < len(self._chapters):
+            self.count_label.setText(
+                f"{len(self._filtered_chapters)} / {len(self._chapters)} chapters"
+            )
+        else:
+            self.count_label.setText(f"{len(self._chapters)} chapters")
+        
         self._update_selected_count()
     
     def _apply_range_selection(self):
@@ -111,7 +178,7 @@ class ChapterListWidget(QWidget):
         if not text:
             return
         
-        total = len(self._chapters)
+        total = len(self._filtered_chapters)
         
         # Handle "all"
         if text.lower() == "all":
@@ -193,7 +260,9 @@ class ChapterListWidget(QWidget):
     def clear(self):
         """Clear the list."""
         self._chapters = []
+        self._filtered_chapters = []
         self.list_widget.clear()
+        self.group_filter.clear()
         self.count_label.setText("0 chapters")
         self.selected_label.setText("0 selected")
         self.range_input.clear()
