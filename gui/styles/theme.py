@@ -265,6 +265,12 @@ QLabel#sectionTitle {{
     color: {COLORS['accent']};
 }}
 
+QLabel#sectionTitle_small {{
+    font-size: 14px;
+    font-weight: bold;
+    color: {COLORS['accent']};
+}}
+
 /* Cards */
 QFrame#card {{
     background-color: {COLORS['surface']};

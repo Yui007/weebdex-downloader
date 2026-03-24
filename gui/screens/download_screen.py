@@ -4,7 +4,8 @@ from typing import Optional, List
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
-    QPushButton, QLabel, QScrollArea, QFrame, QMessageBox
+    QPushButton, QLabel, QScrollArea, QFrame, QMessageBox,
+    QComboBox
 )
 from PyQt6.QtCore import Qt
 
@@ -59,6 +60,29 @@ class DownloadScreen(QWidget):
         url_row.addWidget(self.fetch_btn)
         
         layout.addLayout(url_row)
+        
+        # Filters row (hidden initially)
+        self.filter_row = QHBoxLayout()
+        self.filter_row.setSpacing(12)
+        
+        self.filter_label = QLabel("Filters:")
+        self.filter_label.setObjectName("sectionTitle_small")
+        self.filter_row.addWidget(self.filter_label)
+        
+        self.lang_combo = QComboBox()
+        self.lang_combo.setPlaceholderText("Language")
+        self.lang_combo.currentTextChanged.connect(self._apply_filters)
+        self.filter_row.addWidget(self.lang_combo, 1)
+        
+        self.group_combo = QComboBox()
+        self.group_combo.setPlaceholderText("Group")
+        self.group_combo.currentTextChanged.connect(self._apply_filters)
+        self.filter_row.addWidget(self.group_combo, 1)
+        
+        self.filter_row_widget = QWidget()
+        self.filter_row_widget.setLayout(self.filter_row)
+        self.filter_row_widget.hide()
+        layout.addWidget(self.filter_row_widget)
         
         # Loading label (hidden by default)
         self.loading_label = QLabel("⏳ Fetching manga info...")
@@ -151,8 +175,65 @@ class DownloadScreen(QWidget):
         self.chapter_list.set_chapters(chapters)
         self.chapter_list.show()
         
+        # Populate and show filters
+        self._populate_filters(manga_info, chapters)
+        self.filter_row_widget.show()
+        
         # Show download button
         self.download_widget.show()
+    
+    def _populate_filters(self, manga_info: MangaInfo, chapters: List[Chapter]):
+        """Populate filter dropdowns with available options."""
+        # Block signals to avoid triggering _apply_filters while populating
+        self.lang_combo.blockSignals(True)
+        self.group_combo.blockSignals(True)
+        
+        self.lang_combo.clear()
+        self.group_combo.clear()
+        
+        # Language combo
+        self.lang_combo.addItem("All Languages")
+        if manga_info.available_languages:
+            for lang in sorted(manga_info.available_languages):
+                self.lang_combo.addItem(lang.upper(), lang)
+        
+        # Group combo
+        self.group_combo.addItem("All Groups")
+        groups = set()
+        for ch in chapters:
+            for g in ch.groups:
+                groups.add(g.name)
+        
+        for group_name in sorted(list(groups)):
+            self.group_combo.addItem(group_name)
+        
+        self.lang_combo.blockSignals(False)
+        self.group_combo.blockSignals(False)
+    
+    def _apply_filters(self):
+        """Filter the chapter list based on dropdown selections."""
+        if not self._chapters:
+            return
+            
+        lang_idx = self.lang_combo.currentIndex()
+        lang_filter = self.lang_combo.itemData(lang_idx) if lang_idx > 0 else None
+        
+        group_filter = self.group_combo.currentText()
+        if group_filter == "All Groups":
+            group_filter = None
+            
+        filtered = self._chapters
+        
+        if lang_filter:
+            filtered = [ch for ch in filtered if ch.language == lang_filter]
+            
+        if group_filter:
+            filtered = [
+                ch for ch in filtered 
+                if any(g.name == group_filter for g in ch.groups)
+            ]
+            
+        self.chapter_list.set_chapters(filtered)
     
     def _on_fetch_error(self, message: str):
         """Handle fetch error."""
@@ -227,4 +308,5 @@ class DownloadScreen(QWidget):
         self.chapter_list.clear()
         self.chapter_list.hide()
         self.download_widget.hide()
+        self.filter_row_widget.hide()
         self.progress_widget.reset()

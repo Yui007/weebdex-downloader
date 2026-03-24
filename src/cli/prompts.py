@@ -146,6 +146,53 @@ def prompt_chapter_selection(
         console.print("[dim]Selection cancelled. Enter new selection.[/dim]")
 
 
+def prompt_filter_choice() -> bool:
+    """
+    Ask if user wants to filter chapters.
+    """
+    return Confirm.ask("\nDo you want to filter these chapters (by language/group)?", default=False)
+
+
+def prompt_language_filter(languages: List[str]) -> Optional[str]:
+    """
+    Prompt for language filter.
+    """
+    options = ["All"] + sorted([l.upper() for l in languages])
+    console.print("\n[dim]Select language filter:[/dim]")
+    for i, lang in enumerate(options):
+        console.print(f"[{i}] {lang}")
+    
+    choice = IntPrompt.ask(
+        "\n[bold]Select language[/bold]",
+        choices=[str(i) for i in range(len(options))],
+        default=0
+    )
+    
+    if choice == 0:
+        return None
+    return options[choice].lower()
+
+
+def prompt_group_filter(groups: List[str]) -> Optional[str]:
+    """
+    Prompt for group filter.
+    """
+    options = ["All"] + sorted(groups)
+    console.print("\n[dim]Select scanlation group filter:[/dim]")
+    for i, group in enumerate(options):
+        console.print(f"[{i}] {group}")
+    
+    choice = IntPrompt.ask(
+        "\n[bold]Select group[/bold]",
+        choices=[str(i) for i in range(len(options))],
+        default=0
+    )
+    
+    if choice == 0:
+        return None
+    return options[choice]
+
+
 def prompt_settings_menu(config: Config) -> Config:
     """
     Display settings menu and allow modifications.

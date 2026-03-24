@@ -1,7 +1,7 @@
 """Main CLI application for Weebdex Downloader."""
 
 import sys
-from typing import Optional
+from typing import Optional, List
 
 from rich.live import Live
 
@@ -10,6 +10,7 @@ from ..scraper.manga import MangaScraper
 from ..downloader.chapter import ChapterDownloader
 from ..utils.logging import setup_logging
 from ..api.client import APIError
+from ..models import Chapter
 
 from .display import (
     console,
@@ -27,6 +28,9 @@ from .prompts import (
     prompt_url,
     prompt_chapter_selection,
     prompt_settings_menu,
+    prompt_filter_choice,
+    prompt_language_filter,
+    prompt_group_filter,
 )
 
 
@@ -100,6 +104,15 @@ class WeebdexCLI:
         console.print()
         show_chapters_table(chapters, limit=self.config.max_chapters_display)
         
+        # Filter chapters if requested
+        if prompt_filter_choice():
+            chapters = self._filter_chapters(chapters)
+            if not chapters:
+                show_warning("No chapters match your filters.")
+                return
+            console.print()
+            show_chapters_table(chapters, limit=self.config.max_chapters_display)
+        
         # Get chapter selection
         selected_chapters = prompt_chapter_selection(chapters)
         if not selected_chapters:
@@ -155,6 +168,39 @@ class WeebdexCLI:
             show_warning(f"Downloaded {successful}/{total} chapters. {failed} failed.")
         
         show_info(f"Saved to: {self.config.download_path}")
+    
+    def _filter_chapters(self, chapters: List[Chapter]) -> List[Chapter]:
+        """
+        Filter chapters by language and/or group.
+        """
+        filtered = chapters
+        
+        # Get unique languages
+        languages = list(set(ch.language for ch in chapters))
+        if len(languages) > 1:
+            lang_filter = prompt_language_filter(languages)
+            if lang_filter:
+                filtered = [ch for ch in filtered if ch.language == lang_filter]
+        
+        if not filtered:
+            return []
+            
+        # Get unique groups from currently filtered chapters
+        groups = set()
+        for ch in filtered:
+            for g in ch.groups:
+                groups.add(g.name)
+        
+        groups_list = list(groups)
+        if len(groups_list) > 1:
+            group_filter = prompt_group_filter(groups_list)
+            if group_filter:
+                filtered = [
+                    ch for ch in filtered 
+                    if any(g.name == group_filter for g in ch.groups)
+                ]
+        
+        return filtered
     
     def _handle_settings(self) -> None:
         """Handle the settings menu."""
